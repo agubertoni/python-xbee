@@ -62,8 +62,13 @@ while True:
     try:
 
         frame = xbee.wait_read_frame()
-        timestamp = datetime.datetime.now().isoformat()
-        #print(frame)
+
+        # Timing -----------------------------------
+        now = datetime.datetime.now()
+        timestamp = now.isoformat()
+
+        hour = now.replace(minute=0, second=0, microsecond=0).isoformat()
+        minute = now.minute
 
         source_addr_long = frame['source_addr_long']
         source_addr_long = ':'.join("{:02X}".format(ord(c)) for c in source_addr_long)
@@ -76,6 +81,7 @@ while True:
         rf_data = frame['rf_data'].decode('ascii')
 
         print(timestamp)
+        print(minute)
 
         if rf_data == 'ED Joined':
             print(rf_data)
@@ -85,7 +91,6 @@ while True:
 
             # convert flow value (string) to int to manipulate after
             key_value['flow'] = int(key_value['flow'])
-            key_value['rssi'] = int(key_value['rssi'])
 
             nodeFlowInput = key_value.get('flow')
             print(nodeFlowInput)
@@ -96,12 +101,38 @@ while True:
         print('TX number: ' + str(tx_number))
         print('---------------------------------------------')
 
+        ######################################
+        #        "doc_type": "raw_doc"       #
+        ######################################
 
         db.sensors.update(
-            {"node": source_addr_long},
+            {"node": source_addr_long, "doc_type": "raw_doc"},
             {"$push": {"reads": {
                 "timestamp": timestamp,
                 "flow": nodeFlowInput,
+                "rssi": nodeRssiInput}}},
+            True
+        )
+
+        ######################################
+        #       "doc_type": "hour_doc"       #
+        ######################################
+
+        db.sensors.update(
+            {"node": source_addr_long, "doc_type": "hour_doc", "hour": hour, "parameter": "temp"},
+            {"$push": {"values": nodeFlowInput}},
+            True
+        )
+
+        ######################################
+        #      "doc_type": "morris_doc"      #
+        ######################################
+
+        db.sensors.update(
+            {"node": source_addr_long, "doc_type": "morris_doc", "hour": hour},
+            {"$push": {"values": {
+                "timestamp": timestamp,
+                "temp": nodeFlowInput,
                 "rssi": nodeRssiInput}}},
             True
         )
