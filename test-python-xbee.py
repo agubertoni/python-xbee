@@ -11,7 +11,7 @@ from pymongo import MongoClient
 print('---------------------------------------------------')
 print('Conectando a Coordinador ZigBee...   ')
 
-serial_port = serial.Serial('/dev/ttyUSB0', 9600)
+serial_port = serial.Serial('/dev/ttyUSB3', 9600)
 xbee = ZigBee(serial_port)
 print(xbee)
 
@@ -67,7 +67,7 @@ while True:
         # Timing -----------------------------------
         now = datetime.datetime.now()
         timestamp = now.isoformat()
-        total_millisec = int(time.time() - time.timezone) * 1000
+        timestamp_ms = int(time.time() - time.timezone) * 1000
 
         hour = now.replace(minute=0, second=0, microsecond=0).isoformat()
         minute = now.minute
@@ -84,19 +84,20 @@ while True:
 
         print(timestamp)
 
-        if rf_data == 'ED Joined':
-            print(rf_data)
-        else:
-            # convert string to python dictionary (key/value pairs)
-            key_value = dict(u.split(":") for u in rf_data.split(","))
+        # convert string to python dictionary (key/value pairs)
+        key_value = dict(u.split(":") for u in rf_data.split(","))
 
-            # convert flow value (string) to int to manipulate after
-            key_value['flow'] = int(key_value['flow'])
+        # convert values (string) to int
+        key_value['temp'] = int(key_value['temp'])
+        key_value['brix'] = int(key_value['brix'])
+        key_value['alco'] = int(key_value['alco'])
 
-            nodeFlowInput = key_value.get('flow')
-            print(nodeFlowInput)
-            nodeRssiInput = key_value.get('rssi')
-            print(nodeRssiInput)
+        node_temp = key_value.get('temp')
+        print(node_temp)
+        node_brix = key_value.get('brix')
+        print(node_brix)
+        node_alco = key_value.get('alco')
+        print(node_alco)
 
         tx_number = tx_number + 1;
         print('TX number: ' + str(tx_number))
@@ -110,8 +111,9 @@ while True:
             {"node": source_addr_long, "doc_type": "raw_doc"},
             {"$push": {"reads": {
                 "timestamp": timestamp,
-                "flow": nodeFlowInput,
-                "rssi": nodeRssiInput}}},
+                "temp": node_temp,
+                "brix": node_brix,
+                "alco": node_alco}}},
             True
         )
 
@@ -120,8 +122,9 @@ while True:
         ######################################
 
         db.frames.update(
-            {"node": source_addr_long, "doc_type": "hour_doc", "hour": hour, "parameter": "temp"},
-            {"$push": {"values": nodeFlowInput}},
+            {"node": source_addr_long, "doc_type": "hour_doc",
+             "hour": hour, "parameter": "temp"},
+            {"$push": {"values": node_temp}},
             True
         )
 
@@ -133,8 +136,9 @@ while True:
             {"node": source_addr_long, "doc_type": "morris_doc", "hour": hour},
             {"$push": {"values": {
                 "timestamp": timestamp,
-                "temp": nodeFlowInput,
-                "rssi": nodeRssiInput}}},
+                "temp": node_temp,
+                "brix": node_brix,
+                "alco": node_alco}}},
             True
         )
 
@@ -144,8 +148,8 @@ while True:
 
         db.frames.insert(
             {"node": source_addr_long, "doc_type": "high_doc",
-             "hour": hour, "timestamp": total_millisec,
-             "flow": nodeFlowInput, "rssi": nodeRssiInput}
+             "hour": hour, "timestamp": timestamp_ms,
+             "temp": node_temp, "brix": node_brix, "alco": node_alco}
         )
 
     except KeyboardInterrupt:
