@@ -11,7 +11,7 @@ from pymongo import MongoClient
 print('---------------------------------------------------')
 print('Conectando a Coordinador ZigBee...   ')
 
-serial_port = serial.Serial('/dev/ttyUSB3', 9600)
+serial_port = serial.Serial('/dev/ttyUSB0', 9600)
 xbee = ZigBee(serial_port)
 print(xbee)
 
