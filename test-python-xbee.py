@@ -1,6 +1,7 @@
 import serial
 from xbee import ZigBee
 import datetime
+import time
 import pymongo
 from pymongo import MongoClient
 
@@ -10,7 +11,7 @@ from pymongo import MongoClient
 print('---------------------------------------------------')
 print('Conectando a Coordinador ZigBee...   ')
 
-serial_port = serial.Serial('/dev/ttyUSB1', 9600)
+serial_port = serial.Serial('/dev/ttyUSB0', 9600)
 xbee = ZigBee(serial_port)
 print(xbee)
 
@@ -66,6 +67,7 @@ while True:
         # Timing -----------------------------------
         now = datetime.datetime.now()
         timestamp = now.isoformat()
+        total_millisec = int(time.time() - time.timezone) * 1000
 
         hour = now.replace(minute=0, second=0, microsecond=0).isoformat()
         minute = now.minute
@@ -81,7 +83,6 @@ while True:
         rf_data = frame['rf_data'].decode('ascii')
 
         print(timestamp)
-        print(minute)
 
         if rf_data == 'ED Joined':
             print(rf_data)
@@ -105,7 +106,7 @@ while True:
         #        "doc_type": "raw_doc"       #
         ######################################
 
-        db.sensors.update(
+        db.frames.update(
             {"node": source_addr_long, "doc_type": "raw_doc"},
             {"$push": {"reads": {
                 "timestamp": timestamp,
@@ -118,7 +119,7 @@ while True:
         #       "doc_type": "hour_doc"       #
         ######################################
 
-        db.sensors.update(
+        db.frames.update(
             {"node": source_addr_long, "doc_type": "hour_doc", "hour": hour, "parameter": "temp"},
             {"$push": {"values": nodeFlowInput}},
             True
@@ -128,13 +129,23 @@ while True:
         #      "doc_type": "morris_doc"      #
         ######################################
 
-        db.sensors.update(
+        db.frames.update(
             {"node": source_addr_long, "doc_type": "morris_doc", "hour": hour},
             {"$push": {"values": {
                 "timestamp": timestamp,
                 "temp": nodeFlowInput,
                 "rssi": nodeRssiInput}}},
             True
+        )
+
+        ######################################
+        #       "doc_type": "high_doc"       #
+        ######################################
+
+        db.frames.insert(
+            {"node": source_addr_long, "doc_type": "high_doc",
+             "hour": hour, "timestamp": total_millisec,
+             "flow": nodeFlowInput, "rssi": nodeRssiInput}
         )
 
     except KeyboardInterrupt:
